@@ -24,15 +24,17 @@ int print_text_file(char *path)
 	if(fgets(line, MAXLEN_LINE_FILE, file) == NULL){
 		fprintf(stderr, "File is empty, please especify amount of entries it has\n");
 		perror(NULL);
+		fclose(file);
 		exit(EXIT_FAILURE);
 	}
-	int cases = atoi(line);
+	int cases = strtol(line, NULL, 10);
 
 	for(int i = 0; i < cases; i++){
 		printf("[Entry #%d]\n", i);
 		if(fgets(line, MAXLEN_LINE_FILE, file) == NULL){
 			fprintf(stderr, "Entry Not found\n");
 			perror(NULL);
+			fclose(file);
 			exit(EXIT_FAILURE);
 		}
 
@@ -68,6 +70,7 @@ int print_text_file(char *path)
 		}
 	}
 
+	fclose(file);
 	return 0;
 }
 
@@ -87,30 +90,40 @@ int write_binary_file(char *input_file, char *output_file)
 		exit(EXIT_FAILURE);
 	}
 
+	FILE* output;
+	if((output = fopen(output_file, "wb")) == NULL) {
+		fprintf(stderr, input_file, " could not be opened");
+		perror(NULL);
+		exit(EXIT_FAILURE);
+	}
+
 	student_t data;
 	char line[MAXLEN_LINE_FILE];
 	if(fgets(line, MAXLEN_LINE_FILE, input) == NULL){
 		fprintf(stderr, "File is empty, please especify amount of entries it has\n");
 		perror(NULL);
+		fclose(input);
 		exit(EXIT_FAILURE);
 	}
-	int cases = atoi(line);
+	int cases = strtol(line, NULL, 10);
 
 	for (int i = 0; i < cases; i++)
 	{
 		if(fgets(line, MAXLEN_LINE_FILE, input) == NULL){
 			fprintf(stderr, "Entry Not found\n");
 			perror(NULL);
+			fclose(input);
 			exit(EXIT_FAILURE);
 		}
 
 		char* line_ptr = line;
 		char* token;
+		int id;
 		token_id_t token_id = STUDENT_ID_IDX;
 		while((token = strsep(&line_ptr, ":")) != NULL){
 			switch(token_id){
 			case STUDENT_ID_IDX:
-				data.student_id = atoi(token);	
+				data.student_id = strtol(token, NULL, 10);
 				break;
 			case NIF_IDX:
 				//Forma que no me gusta
@@ -130,14 +143,28 @@ int write_binary_file(char *input_file, char *output_file)
 			default:
 				fprintf(stderr, "No option found for this student field");
 				perror(NULL);
+				fclose(input);
 				exit(EXIT_FAILURE);
 			}
 			token_id++;
 		}
+		
+		fseek(output, 0, SEEK_END);
 
-		/* Escribir en binario en el archivo ouput data */
+		id = data.student_id;
+		fwrite(&data.student_id, sizeof(int), sizeof(data.student_id), output);
+		fwrite("\0", sizeof(char), 1, output);
+		fwrite(data.NIF, sizeof(char), strlen(data.NIF), output);
+		fwrite("\0", sizeof(char), 1, output);
+		fwrite(data.first_name, sizeof(char), strlen(data.first_name), output);
+		fwrite("\0", sizeof(char), 1, output);
+		fwrite(data.last_name, sizeof(char), strlen(data.last_name), output);
+		fwrite("\0", sizeof(char), 1, output);
+		
 	}
-	printf("Stop");
+	fclose(input);
+	fclose(output);
+	printf("%d Entries have been written on %s\n", cases, output_file);
 	
 	free(data.first_name);
 	free(data.last_name);
