@@ -103,9 +103,12 @@ int write_binary_file(char *input_file, char *output_file)
 		fprintf(stderr, "File is empty, please especify amount of entries it has\n");
 		perror(NULL);
 		fclose(input);
+		fclose(output);
 		exit(EXIT_FAILURE);
 	}
 	int cases = strtol(line, NULL, 10);
+
+	fwrite(&cases, 4, 1, output);
 
 	for (int i = 0; i < cases; i++)
 	{
@@ -113,6 +116,7 @@ int write_binary_file(char *input_file, char *output_file)
 			fprintf(stderr, "Entry Not found\n");
 			perror(NULL);
 			fclose(input);
+			fclose(output);
 			exit(EXIT_FAILURE);
 		}
 
@@ -124,43 +128,54 @@ int write_binary_file(char *input_file, char *output_file)
 			switch(token_id){
 			case STUDENT_ID_IDX:
 				data.student_id = strtol(token, NULL, 10);
+				fwrite(&data.student_id, 4, 1, output);
 				break;
 			case NIF_IDX:
 				//Forma que no me gusta
 				for(int j = 0; j < MAX_CHARS_NIF+1; j++){
 					data.NIF[j] = token[j];
 				}
+				fwrite(data.NIF, sizeof(char), sizeof(data.NIF), output);
 				// data.NIF = token; lanza un error de que no es modificable
 				break;
 			case FIRST_NAME_IDX:
 				data.first_name = malloc(MAXLEN_LINE_FILE);
 				strcpy(data.first_name, token);
+				fwrite(data.first_name, sizeof(char), strlen(data.first_name)+1, output);
 				break;
 			case LAST_NAME_IDX:
 				data.last_name = malloc(MAXLEN_LINE_FILE);
 				strcpy(data.last_name, token);
+				fwrite(data.last_name, sizeof(char), strlen(data.last_name)+1, output);
 				break;
 			default:
 				fprintf(stderr, "No option found for this student field");
 				perror(NULL);
 				fclose(input);
+				fclose(output);
 				exit(EXIT_FAILURE);
 			}
 			token_id++;
 		}
-		
-		fseek(output, 0, SEEK_END);
 
-		id = data.student_id;
-		fwrite(&data.student_id, sizeof(int), sizeof(data.student_id), output);
-		fwrite("\0", sizeof(char), 1, output);
-		fwrite(data.NIF, sizeof(char), strlen(data.NIF), output);
-		fwrite("\0", sizeof(char), 1, output);
-		fwrite(data.first_name, sizeof(char), strlen(data.first_name), output);
-		fwrite("\0", sizeof(char), 1, output);
-		fwrite(data.last_name, sizeof(char), strlen(data.last_name), output);
-		fwrite("\0", sizeof(char), 1, output);
-		
+		/*if(fwrite(&data.NIF, sizeof(char), sizeof(data.NIF), output) != sizeof(data.NIF)){
+			fprintf(stderr, "No option found for this student field");
+			perror(NULL);
+			fclose(input);
+			exit(EXIT_FAILURE);
+		}
+		if (fwrite(&data.first_name, sizeof(char), sizeof(data.first_name), output) != sizeof(data.first_name)){
+			fprintf(stderr, "No option found for this student field");
+			perror(NULL);
+			fclose(input);
+			exit(EXIT_FAILURE);
+		}
+		if(fwrite(&data.last_name, sizeof(char), sizeof(data.last_name), output) != sizeof(data.last_name)){
+			fprintf(stderr, "No option found for this student field");
+			perror(NULL);
+			fclose(input);
+			exit(EXIT_FAILURE);
+		}*/
 	}
 	fclose(input);
 	fclose(output);
