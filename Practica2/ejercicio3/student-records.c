@@ -76,13 +76,106 @@ int print_text_file(char *path)
 
 int print_binary_file(char *path)
 {
-	/* To be completed  (part C) */
+	FILE* input;
+	if((input = fopen(path, "r")) == NULL){ // "rb abre en modo binario"
+		fprintf(stderr, path, " could not be opened");
+		perror(NULL);
+		exit(EXIT_FAILURE);
+	}
+
+	char line[MAXLEN_LINE_FILE];
+	if(fread(line, 4, 1, input) != 1){
+		fprintf(stderr, "File is empty, please especify amount of entries it has\n");
+		perror(NULL);
+		fclose(input);
+		exit(EXIT_FAILURE);
+	}
+	int cases = line[0]; // strtol no funciona incluso con esto: &line[0] = 4
+
+	student_t data;
+	for(int i = 0; i < cases; i++){
+		printf("Entry #%d\n", i);
+
+		if(fread(line, 4, 1, input) != 1){
+			fprintf(stderr, "Not right format\n");
+			perror(NULL);
+			fclose(input);
+			exit(EXIT_FAILURE);
+		}
+		data.student_id = line[0];
+		printf("\tstudent_id = %d\n", data.student_id);
+
+		if(fread(line, sizeof(char), sizeof(data.NIF), input) != sizeof(data.NIF)){
+			fprintf(stderr, "Not right format\n");
+			perror(NULL);
+			fclose(input);
+			exit(EXIT_FAILURE);
+		}
+		for(int j = 0; j < MAX_CHARS_NIF+1; j++){
+			data.NIF[j] = line[j];
+		}
+		printf("\tNIF = %s\n", data.NIF);
+
+		long int original_pos = ftell(input);
+		int c;
+		int capacidad = 10;
+		int size = 0;
+		data.first_name = malloc(capacidad);
+		while((c = getc(input)) != EOF && c != '\0'){
+			size++;
+			if(size >= capacidad){
+				capacidad *= 2;
+				char* tmp = realloc(data.first_name, capacidad);
+				if(!tmp){
+					free(data.first_name);
+					exit(EXIT_FAILURE);
+				}
+				data.first_name = tmp;
+			}
+		}
+		if(fseek(input, original_pos, SEEK_SET)){
+			free(data.first_name);
+			exit(EXIT_FAILURE);
+		}
+		int k = 0;
+		while((c = getc(input)) != EOF && c != '\0')
+			data.first_name[k++] = (char) c;
+		printf("\tfirst_name = %s\n", data.first_name);
+		free(data.first_name);
+
+		original_pos = ftell(input);
+		capacidad = 10;
+		size = 0;
+		data.last_name = malloc(capacidad);
+		while((c = getc(input)) != EOF && c != '\0'){
+			size++;
+			if(size >= capacidad){
+				capacidad *= 2;
+				char* tmp = realloc(data.last_name, capacidad);
+				if(!tmp){
+					free(data.last_name);
+					exit(EXIT_FAILURE);
+				}
+				data.last_name = tmp;
+			}
+		}
+		if(fseek(input, original_pos, SEEK_SET)){
+			free(data.first_name);
+			exit(EXIT_FAILURE);
+		}
+		k = 0;
+		while((c = getc(input)) != EOF && c != '\0')
+			data.last_name[k++] = (char) c;
+			printf("\tlast_name = %s\n", data.last_name);
+			free(data.last_name);
+	}
+
 	return 0;
 }
 
 
 int write_binary_file(char *input_file, char *output_file)
-{
+{ // Me falta el control de errores al escribir en todos los fwrite
 	FILE* input;
 	if((input = fopen(input_file, "rb")) == NULL){ // "rb abre en modo binario"
 		fprintf(stderr, input_file, " could not be opened");
@@ -157,25 +250,6 @@ int write_binary_file(char *input_file, char *output_file)
 			}
 			token_id++;
 		}
-
-		/*if(fwrite(&data.NIF, sizeof(char), sizeof(data.NIF), output) != sizeof(data.NIF)){
-			fprintf(stderr, "No option found for this student field");
-			perror(NULL);
-			fclose(input);
-			exit(EXIT_FAILURE);
-		}
-		if (fwrite(&data.first_name, sizeof(char), sizeof(data.first_name), output) != sizeof(data.first_name)){
-			fprintf(stderr, "No option found for this student field");
-			perror(NULL);
-			fclose(input);
-			exit(EXIT_FAILURE);
-		}
-		if(fwrite(&data.last_name, sizeof(char), sizeof(data.last_name), output) != sizeof(data.last_name)){
-			fprintf(stderr, "No option found for this student field");
-			perror(NULL);
-			fclose(input);
-			exit(EXIT_FAILURE);
-		}*/
 	}
 	fclose(input);
 	fclose(output);
@@ -198,12 +272,12 @@ int main(int argc, char *argv[])
 	ret_code = 0;
 
 	/* Parse command-line options (incomplete code!) */
-	while ((opt = getopt(argc, argv, "hi:po:")) != -1)
+	while ((opt = getopt(argc, argv, "hi:po:b")) != -1)
 	{
 		switch (opt)
 		{
 		case 'h':
-			fprintf(stderr, "Usage: %s [ -h | -i <input_file> | -o <output_file> | -p ]\n", argv[0]);
+			fprintf(stderr, "Usage: %s [ -h | -i <input_file> | -o <output_file> | -p | -b ]\n", argv[0]);
 			exit(EXIT_SUCCESS);
 		case 'i':
 			options.input_file = optarg;
@@ -214,6 +288,9 @@ int main(int argc, char *argv[])
 		case 'o':
 			options.action = WRITE_BINARY_ACT;
 			options.output_file = optarg;
+			break;
+		case 'b':
+			options.action = PRINT_BINARY_ACT;
 			break;
 		default:
 			exit(EXIT_FAILURE);

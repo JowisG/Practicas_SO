@@ -6,8 +6,8 @@
             "request": "launch",
             "program": "${fileDirname}/${fileBasenameNoExtension}",
             "args": [
-                "-istudents-db.txt",
-                "-ostudents-out.bin"
+                "-istudents-out.bin",
+                "-b"
             ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
