@@ -77,7 +77,7 @@ int print_text_file(char *path)
 int print_binary_file(char *path)
 {
 	FILE* input;
-	if((input = fopen(path, "r")) == NULL){ // "rb abre en modo binario"
+	if((input = fopen(path, "r")) == NULL){ 
 		fprintf(stderr, path, " could not be opened");
 		perror(NULL);
 		exit(EXIT_FAILURE);
@@ -166,8 +166,8 @@ int print_binary_file(char *path)
 		k = 0;
 		while((c = getc(input)) != EOF && c != '\0')
 			data.last_name[k++] = (char) c;
-			printf("\tlast_name = %s\n", data.last_name);
-			free(data.last_name);
+		printf("\tlast_name = %s\n", data.last_name);
+		free(data.last_name);
 	}
 
 	return 0;
@@ -224,11 +224,13 @@ int write_binary_file(char *input_file, char *output_file)
 				fwrite(&data.student_id, 4, 1, output);
 				break;
 			case NIF_IDX:
-				//Forma que no me gusta
-				for(int j = 0; j < MAX_CHARS_NIF+1; j++){
-					data.NIF[j] = token[j];
+				memset(data.NIF, 0, strlen(data.NIF));
+				int j = 0;
+				while(j < MAX_CHARS_NIF+1 && token[j] != '\0'){
+						data.NIF[j] = token[j];
+						j++;
 				}
-				fwrite(data.NIF, sizeof(char), sizeof(data.NIF), output);
+				fwrite(data.NIF, sizeof(char), j+1, output);
 				// data.NIF = token; lanza un error de que no es modificable
 				break;
 			case FIRST_NAME_IDX:
