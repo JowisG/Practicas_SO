@@ -3,9 +3,9 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define CAPACITY 5
+#define CAPACITY 2
 #define NUM_HILOS 50
-#define VIPSTR(vip) ((vip) ? "  vip  " : "not vip")
+#define VIPSTR(vip) ((vip) ? "  VIP  " : "not vip")
 
 typedef struct{
 	int turno;
@@ -28,11 +28,13 @@ void enter_normal_client(cliente_t cliente)
 
 	// sala de espera
 	while(n_pista >= CAPACITY || n_vips > 0 || turno_act_n != cliente.turno){
-		printf("Hilo de cliente normal %d ha entrado\n", cliente.id);
+		printf("Hilo de cliente NORMAL con turno: %d en cola. Turnos de NORMAL: %d\n", cliente.turno, turno_act_n);
+		//printf("Id NORMAL: %d\n", cliente.id);
 		pthread_cond_wait(&normales, mutex);
 	}
 
 	// *se vienen cositas
+	printf("NORMAL con turno: %d SALE. Turnos de NORMAL: %d\n", cliente.turno, turno_act_vip);
 	n_pista++;
 	n_normales--;
 	turno_act_n++;
@@ -48,11 +50,13 @@ void enter_vip_client(cliente_t cliente)
 
 	// sala de espera
 	while(n_pista >= CAPACITY || turno_act_vip != cliente.turno){
-		printf("Hilo de cliente vip %d ha entrado\n", cliente.id);
+		printf("Hilo de cliente VIP con turno: %d en cola. Turnos de VIP: %d\n", cliente.turno, turno_act_vip);
+		//printf("Id VIP: %d\n", cliente.id);
 		pthread_cond_wait(&vips, mutex);
 	}
 
 	// *se vienen cositas
+	printf("VIP con turno: %d SALE. Turnos de VIP: %d\n", cliente.turno, turno_act_vip);
 	n_pista++;
 	n_vips--;
 	turno_act_vip++;
@@ -62,8 +66,10 @@ void enter_vip_client(cliente_t cliente)
 
 void dance(int id, int isvip)
 {
-	printf("Client %2d (%s) dancing in disco\n", id, VIPSTR(isvip));
-	sleep((rand() % 3) + 1);
+	printf("Client %2d (%s) dancing in disco. ", id, VIPSTR(isvip));
+	int time = (rand() % 1) + 1;
+	printf("Time dacing: %d\n", time);
+	sleep(time);
 }
 
 void disco_exit(int id, int isvip)
@@ -137,27 +143,26 @@ int main(int argc, char *argv[])
 
 	l_pid = malloc(num_personas*sizeof(pthread_t));
 
+	int cont_normales = 0;
+	int cont_vips = 0;
 	for(int i = 0; i < num_personas; i++){
 		int vip;
 		if(fscanf(file, "%d", &vip) == 0){
 			perror("You never learnt how to read");
 			exit(EXIT_FAILURE);
 		}
+
 		// !Crear hilo
-
-
-		int cont_n = -1;
-		int cont_v = -1;
-		if(vip == 1)
-			cont_v++;
-		else
-			cont_n++;
 		cliente_t cliente;
 		cliente.vip = vip;
-		if(vip == 1)
-			cliente.turno = cont_v;
-		else
-			cliente.turno = cont_n;
+		if (vip) {
+			cliente.turno = cont_vips;
+			cont_vips++;
+		}else{
+			cliente.turno = cont_normales;
+			cont_normales++;
+		}
+		//IMP pthread_create crea los huilos desordenados y a veces se edita antes el cliente.turno de lo que pthread tarda en crear el thread con cliente.turno correspondiente
 		if(pthread_create(&l_pid[i], NULL, client, &cliente) != 0){
 			perror("error creating thread");
 			exit(EXIT_FAILURE);
@@ -173,5 +178,7 @@ int main(int argc, char *argv[])
 	// *Liberacion de memoria
 	free(l_pid);
 	pthread_mutex_destroy(mutex);
+	pthread_cond_destroy(&normales);
+	pthread_cond_destroy(&vips);
 	return 0;
 }
