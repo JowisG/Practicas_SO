@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define CAPACITY 2
+#define CAPACITY 1
 #define NUM_HILOS 50
 #define VIPSTR(vip) ((vip) ? "  VIP  " : "not vip")
 
@@ -28,13 +28,13 @@ void enter_normal_client(cliente_t cliente)
 
 	// sala de espera
 	while(n_pista >= CAPACITY || n_vips > 0 || turno_act_n != cliente.turno){
-		printf("Hilo de cliente NORMAL con turno: %d en cola. Turnos de NORMAL: %d\n", cliente.turno, turno_act_n);
+		//printf("Hilo de cliente NORMAL con turno: %d en cola. Turnos de NORMAL: %d\n", cliente.turno, turno_act_n);
 		//printf("Id NORMAL: %d\n", cliente.id);
 		pthread_cond_wait(&normales, mutex);
 	}
 
 	// *se vienen cositas
-	printf("NORMAL con turno: %d SALE. Turnos de NORMAL: %d\n", cliente.turno, turno_act_vip);
+	//printf("NORMAL con turno: %d SALE. Turnos de NORMAL: %d\n", cliente.turno, turno_act_vip);
 	n_pista++;
 	n_normales--;
 	turno_act_n++;
@@ -50,13 +50,13 @@ void enter_vip_client(cliente_t cliente)
 
 	// sala de espera
 	while(n_pista >= CAPACITY || turno_act_vip != cliente.turno){
-		printf("Hilo de cliente VIP con turno: %d en cola. Turnos de VIP: %d\n", cliente.turno, turno_act_vip);
+		//printf("Hilo de cliente VIP con turno: %d en cola. Turnos de VIP: %d\n", cliente.turno, turno_act_vip);
 		//printf("Id VIP: %d\n", cliente.id);
 		pthread_cond_wait(&vips, mutex);
 	}
 
 	// *se vienen cositas
-	printf("VIP con turno: %d SALE. Turnos de VIP: %d\n", cliente.turno, turno_act_vip);
+	//printf("VIP con turno: %d SALE. Turnos de VIP: %d\n", cliente.turno, turno_act_vip);
 	n_pista++;
 	n_vips--;
 	turno_act_vip++;
@@ -66,9 +66,8 @@ void enter_vip_client(cliente_t cliente)
 
 void dance(int id, int isvip)
 {
-	printf("Client %2d (%s) dancing in disco. ", id, VIPSTR(isvip));
-	int time = (rand() % 1) + 1;
-	printf("Time dacing: %d\n", time);
+	int time = (rand() % 5) + 1;
+	printf("Client %2d (%s) dancing in disco. Time dacing: %d\n", id, VIPSTR(isvip), time);
 	sleep(time);
 }
 
@@ -145,7 +144,8 @@ int main(int argc, char *argv[])
 
 	int cont_normales = 0;
 	int cont_vips = 0;
-	for(int i = 0; i < num_personas; i++){
+	cliente_t clientes[num_personas];
+	for (int i = 0; i < num_personas; i++){
 		int vip;
 		if(fscanf(file, "%d", &vip) == 0){
 			perror("You never learnt how to read");
@@ -162,8 +162,13 @@ int main(int argc, char *argv[])
 			cliente.turno = cont_normales;
 			cont_normales++;
 		}
+		clientes[i] = cliente;
+	}
+
+	for(int i = 0; i < num_personas; i++){
+		
 		//IMP pthread_create crea los huilos desordenados y a veces se edita antes el cliente.turno de lo que pthread tarda en crear el thread con cliente.turno correspondiente
-		if(pthread_create(&l_pid[i], NULL, client, &cliente) != 0){
+		if(pthread_create(&l_pid[i], NULL, client, &clientes[i]) != 0){
 			perror("error creating thread");
 			exit(EXIT_FAILURE);
 		}
