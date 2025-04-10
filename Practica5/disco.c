@@ -99,6 +99,8 @@ void *client(void *arg)
 	dance(cliente.id, cliente.vip);
 
 	disco_exit(cliente.id, cliente.vip);
+
+	pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[])
