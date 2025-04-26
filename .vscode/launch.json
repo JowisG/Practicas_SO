@@ -6,8 +6,7 @@
             "request": "launch",
             "program": "${fileDirname}/${fileBasenameNoExtension}",
             "args": [
-                "-istudents-out.bin",
-                "-b"
+                "ejemplo.txt"
             ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",

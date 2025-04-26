@@ -1,12 +1,40 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <pthread.h>
+#include <stdio.h> //* Standart input/output library functions fgets, fopen...
+#include <stdlib.h> // Para cosas estandar como malloc
+#include <unistd.h> //! Para la usar sleep y read, write, close y getopt
+#include <pthread.h> //IMP Para los hilos (threads)
+//\ #include <string.h> //! Para las funciones de string: strcpy, strdup, strlen, strsep...
+//\ #include <ctype.h> // Pra incluir más cosas para los char funciones de toupper y cosas asi
+//\ #include <fcntl> //IMP Para las constantes de los ficheros O_
+/*
+* 	O_RDONLY: Solo lectura.
+*	O_WRONLY: Solo escritura.
+*	O_CREAT: Crea el archivo si no existe.
+*	O_TRUNC: Si el archivo existe y se abre para escritura, lo trunca (borra su contenido).
+*	O_APPEND: Escritura, pero añadiendo al final.
+*	O_RDWR: Lectura y escritura. 
+ */
+//\ #include <sys/types.h> //# para el mode_t
+//\ #inclued <sys/stat.h> //# para el mode_t y stat
+/*
+!    ino_t     st_ino;     // Número de inodo
+!    mode_t    st_mode;    // Permisos y tipo de archivo
+!    nlink_t   st_nlink;   // Número de enlaces duros
+!    off_t     st_size;    // Tamaño total, en bytes
+!    blksize_t st_blksize; // Tamaño de bloque para E/S
+!    blkcnt_t  st_blocks;  // Número de bloques asignados
+*/
+//\ #include <dirent.h> //* Para el manejo de DIR
 
-#define CAPACITY 1
+#define CAPACITY 2
 #define NUM_HILOS 50
 #define VIPSTR(vip) ((vip) ? "  VIP  " : "not vip")
 
+/**
+ * @brief Estructura que define un cliente, siendo este vip o no, con un turno y un id
+ * @param turno Es el turno el cual el cliente tiene para poder entarr en la discoteca (Se define añ crearse el cliente)
+ * @param vip Define si es vip (1) o si es normal (0)
+ * @param id Es el id del hilo
+ */
 typedef struct{
 	int turno;
 	int vip;
@@ -20,6 +48,16 @@ pthread_cond_t normales, vips;
 
 int n_normales, n_vips, turno_act_n, turno_act_vip, n_pista;
 
+/**
+ * @brief Cola de los clientes normales. Tiene una sala de espera la cual esta en una sección critica con una variable condicional:
+ * @brief - Solo salen si la pista tiene espacio
+ * @brief - Si no hay vips
+ * @brief - Si es el turno del cliente que quiere salir
+ * 
+ * Una vez salen actualizan el turno y la cantidad de gente en la pista y la cantidad de gente en la cola.
+ * @param cliente cliente_t
+ * @return
+ */
 void enter_normal_client(cliente_t cliente)
 {
 	pthread_mutex_lock(mutex); // !cerrar mutex
@@ -40,6 +78,15 @@ void enter_normal_client(cliente_t cliente)
 	pthread_mutex_unlock(mutex); // ?abrir mutex
 }
 
+/**
+ * @brief Cola de los vips. Tiene una sala de espera la cual esta en una sección critica con una variable condicional:
+ * @brief - Solo salen si la pista tiene espacio
+ * @brief - Si es el turno del vip que quiere salir
+ * 
+ * Una vez salen actualizan el turno y la cantidad de gente en la pista y la cantidad de gente en la cola.
+ * @param cliente cliente_t
+ * @return
+ */
 void enter_vip_client(cliente_t cliente)
 {
 	pthread_mutex_lock(mutex); // !cerrar mutex
@@ -59,20 +106,33 @@ void enter_vip_client(cliente_t cliente)
 
 	pthread_mutex_unlock(mutex); // ?abrir mutex
 }
-
+/**
+ * @brief Simula que los clientes estan bailando durante un tiempo aleatorio
+ * @param id id del cliente
+ * @param isvip si es vip el cliente
+ * @return
+ */
 void dance(int id, int isvip)
 {
-	int time = (rand() % 2) + 1;
+	int time = (rand() % 5) + 1;
 	printf("Client %d (%s) dancing in disco. Time dacing: %d\n", id, VIPSTR(isvip), time);
 	sleep(time);
 }
 
+/**
+ * @brief La salida de la psita de la discoteca. Cuando el cliente sale disminuye la cantidad de clientes la disco luego procede
+ * a ver si quedan vips para llamar 1 a 1 (si se cambia broadcast llama a todos) para que pruebe si puede entar en la dico.
+ * @param id id del cliente
+ * @param isvip si es vip el cliente
+ * @return
+ */
 void disco_exit(int id, int isvip)
 {
 	pthread_mutex_lock(mutex); //! cerrar mutex
 	
 	n_pista--;
 	printf("\tThe cliente %d (%s) exits the disco.\n", id, VIPSTR(isvip));
+	// Pascal dijo que sería mejor si usamos broadcast, aunque me funciona con signal
 	if(n_vips > 0)
 		pthread_cond_signal(&vips); //# llamamos a la sala vip de 1 en 1 (con broadcast se levantan todos)
 	else
@@ -81,6 +141,13 @@ void disco_exit(int id, int isvip)
 	pthread_mutex_unlock(mutex); //? abrir mutex
 }
 
+/**
+ * @brief IMPORTANT funcion anonima. Se llama despues de crear el hilo del cliente se encarga de dirigir a los normales
+ * a la cola de los normales y los vips a la cola de los vips. Tabien se encarga de desreferenciar la entrada args a cliente_t
+ * y le pone el id al cliente con el id del thread.
+ * @param *args void: puntero que deberá venir con un cliente_t
+ * @return NULL
+ */
 void *client(void *arg)
 {
 	//b* Desreferenciamos el argumento
@@ -92,7 +159,7 @@ void *client(void *arg)
 		enter_vip_client(*cliente); //! Entramos en la cola de los vips
 	}
 	else{
-		enter_normal_client(*cliente);//! Rntramos en la cola de los normales
+		enter_normal_client(*cliente);//! Entramos en la cola de los normales
 	}
 
 	dance(cliente->id, cliente->vip); //? Bailamos al salir de la cola
@@ -133,6 +200,7 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	//! Abrimos el archivo
 	FILE* file;
 	file = fopen(file_name, "r");
 	if(file == NULL){
@@ -189,6 +257,7 @@ int main(int argc, char *argv[])
 		pthread_join(l_pid[i], NULL);
 	}
 
+	printf("\n----Fin del programa: todos los hilos han terminado----\n");
 
 	//* Liberacion de memoria
 	free(l_pid);
