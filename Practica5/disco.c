@@ -25,7 +25,7 @@
 */
 //\ #include <dirent.h> //* Para el manejo de DIR
 
-#define CAPACITY 2
+#define CAPACITY 5
 #define NUM_HILOS 50
 #define VIPSTR(vip) ((vip) ? "  VIP  " : "not vip")
 
@@ -42,7 +42,7 @@ typedef struct{
 }cliente_t;
 
 // !threads y mutex
-pthread_mutex_t* mutex;
+pthread_mutex_t mutex;
 // ?var condicionales
 pthread_cond_t normales, vips;
 
@@ -58,24 +58,24 @@ int n_normales, n_vips, turno_act_n, turno_act_vip, n_pista;
  * @param cliente cliente_t
  * @return
  */
-void enter_normal_client(cliente_t cliente)
+void enter_normal_client(cliente_t* cliente)
 {
-	pthread_mutex_lock(mutex); // !cerrar mutex
+	pthread_mutex_lock(&mutex); // !cerrar mutex
 	
 	n_normales++;
 
 	//? sala de espera
-	while(n_pista >= CAPACITY || n_vips > 0 || turno_act_n != cliente.turno){ //* Condiciones para salir de la sala de espera
-		pthread_cond_wait(&normales, mutex);
+	while(n_pista >= CAPACITY || n_vips > 0 || turno_act_n != cliente->turno){ //* Condiciones para salir de la sala de espera
+		pthread_cond_wait(&normales, &mutex);
 	}
 
 	//* Cuando sale de la cola
-	printf("NORMAL with turn: %d finished QEUEU. Turns of NORMAL: %d\n", cliente.turno, turno_act_vip);
+	printf("NORMAL with turn: %d finished QEUEU. Turns of NORMAL: %d\n", cliente->turno, turno_act_vip);
 	n_pista++;
 	n_normales--;
 	turno_act_n++;
 
-	pthread_mutex_unlock(mutex); // ?abrir mutex
+	pthread_mutex_unlock(&mutex); // ?abrir mutex
 }
 
 /**
@@ -87,24 +87,24 @@ void enter_normal_client(cliente_t cliente)
  * @param cliente cliente_t
  * @return
  */
-void enter_vip_client(cliente_t cliente)
+void enter_vip_client(cliente_t* cliente)
 {
-	pthread_mutex_lock(mutex); // !cerrar mutex
+	pthread_mutex_lock(&mutex); // !cerrar mutex
 	
 	n_vips++;
 
 	//? sala de espera
-	while(n_pista >= CAPACITY || turno_act_vip != cliente.turno){ //* Condiciones para salir de la sala de espera
-		pthread_cond_wait(&vips, mutex); //? Sala de espera
+	while(n_pista >= CAPACITY || turno_act_vip != cliente->turno){ //* Condiciones para salir de la sala de espera
+		pthread_cond_wait(&vips, &mutex); //? Sala de espera
 	}
 
 	//* Cuando sale de la cola
-	printf("VIP with turn: %d finished QEUEU. Turns of VIP: %d\n", cliente.turno, turno_act_vip);
+	printf("VIP with turn: %d finished QEUEU. Turns of VIP: %d\n", cliente->turno, turno_act_vip);
 	n_pista++;
 	n_vips--;
 	turno_act_vip++;
 
-	pthread_mutex_unlock(mutex); // ?abrir mutex
+	pthread_mutex_unlock(&mutex); // ?abrir mutex
 }
 /**
  * @brief Simula que los clientes estan bailando durante un tiempo aleatorio
@@ -115,7 +115,7 @@ void enter_vip_client(cliente_t cliente)
 void dance(int id, int isvip)
 {
 	int time = (rand() % 5) + 1;
-	printf("Client %d (%s) dancing in disco. Time dacing: %d\n", id, VIPSTR(isvip), time);
+	printf("\tClient %d (%s) dancing in disco. Time dacing: %d\n", id, VIPSTR(isvip), time);
 	sleep(time);
 }
 
@@ -128,17 +128,17 @@ void dance(int id, int isvip)
  */
 void disco_exit(int id, int isvip)
 {
-	pthread_mutex_lock(mutex); //! cerrar mutex
+	pthread_mutex_lock(&mutex); //! cerrar mutex
 	
 	n_pista--;
 	printf("\tThe cliente %d (%s) exits the disco.\n", id, VIPSTR(isvip));
 	// Pascal dijo que sería mejor si usamos broadcast, aunque me funciona con signal
 	if(n_vips > 0)
-		pthread_cond_signal(&vips); //# llamamos a la sala vip de 1 en 1 (con broadcast se levantan todos)
+		pthread_cond_signal(&vips); //# llamamos a todos de sala vip de (con signal se llama a 1)
 	else
-		pthread_cond_signal(&normales); //# llamamos a la sala normal de 1 en 1 (con broadcast se levantan todos)
+		pthread_cond_signal(&normales); //# llamamos a todos de sala normal de 1 en 1 (con signal se llama a 1)
 
-	pthread_mutex_unlock(mutex); //? abrir mutex
+	pthread_mutex_unlock(&mutex); //? abrir mutex
 }
 
 /**
@@ -152,14 +152,13 @@ void *client(void *arg)
 {
 	//b* Desreferenciamos el argumento
 	cliente_t* cliente = (cliente_t*)arg;
-	cliente->id = pthread_self();
 
 	// Miramos si es un vip
 	if (cliente->vip){
-		enter_vip_client(*cliente); //! Entramos en la cola de los vips
+		enter_vip_client(cliente); //! Entramos en la cola de los vips
 	}
 	else{
-		enter_normal_client(*cliente);//! Entramos en la cola de los normales
+		enter_normal_client(cliente);//! Entramos en la cola de los normales
 	}
 
 	dance(cliente->id, cliente->vip); //? Bailamos al salir de la cola
@@ -172,8 +171,7 @@ void *client(void *arg)
 int main(int argc, char *argv[])
 {
 	//# incializar memoria global y mutex
-	mutex = malloc(sizeof(pthread_mutex_t));
-	if (pthread_mutex_init(mutex, NULL) != 0){
+	if (pthread_mutex_init(&mutex, NULL) != 0){
 		perror("mutex init error");                                        
     	exit(EXIT_FAILURE);   
 	}
@@ -204,14 +202,14 @@ int main(int argc, char *argv[])
 	FILE* file;
 	file = fopen(file_name, "r");
 	if(file == NULL){
-		perror("file does not like u");
+		perror("No se pudo abrir el fichero");
 		exit(EXIT_FAILURE);
 	}
 
 	//b* Leemos el archivo
 	int num_personas; // leemos la cantidad de clientes
 	if(fscanf(file, "%d", &num_personas) == 0){
-		perror("You never learnt how to read");
+		perror("Error al leer la cantidad de clientes");
 		exit(EXIT_FAILURE);
 	}
 
@@ -221,12 +219,13 @@ int main(int argc, char *argv[])
 	//* Comenzamos 2 contadores para los turnos de los vips y normales
 	int cont_normales = 0;
 	int cont_vips = 0;
+	int cont = 0;
 	cliente_t clientes[num_personas];
 	for (int i = 0; i < num_personas; i++){
 		//b* Leemos sie es un vip o no
 		int vip;
 		if(fscanf(file, "%d", &vip) == 0){
-			perror("You never learnt how to read");
+			perror("No se pudo leer la informacion del cliente");
 			exit(EXIT_FAILURE);
 		}
 
@@ -235,19 +234,22 @@ int main(int argc, char *argv[])
 		cliente.vip = vip;
 		if (vip) {
 			cliente.turno = cont_vips;
+			cliente.id = cont;
 			cont_vips++;
 		}else{
 			cliente.turno = cont_normales;
+			cliente.id = cont;
 			cont_normales++;
 		}
 		clientes[i] = cliente;
+		cont++;
 	}
 
 	for(int i = 0; i < num_personas; i++){
 		
 		//# Creamos el hilo con la información correpondiente
 		if(pthread_create(&l_pid[i], NULL, client, &clientes[i]) != 0){
-			perror("error creating thread");
+			perror("error al crear el hilo");
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -261,7 +263,7 @@ int main(int argc, char *argv[])
 
 	//* Liberacion de memoria
 	free(l_pid);
-	pthread_mutex_destroy(mutex);
+	pthread_mutex_destroy(&mutex);
 	pthread_cond_destroy(&normales);
 	pthread_cond_destroy(&vips);
 	return 0;
